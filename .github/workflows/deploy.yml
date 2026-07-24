@@ -26,8 +26,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Correct path after restructuring:
-          path: './ocf-library-management-system/frontend'
+          # Pointing to the exact location of the frontend folder:
+          path: './unity-reads-repo/frontend'
 
   deploy:
     environment:
