@@ -124,7 +124,7 @@ app.post('/webhook/library-admin-overview', (req, res) => {
 // ==========================================
 // 5. SERVER BINDING & LISTEN
 // ==========================================
-const PORT = process.env.PORT || 8080;
+
 
 // Always prefer process.env.PORT provided dynamically by Railway
 const PORT = process.env.PORT || 8080;
