@@ -90,10 +90,25 @@ app.post('/webhook/library-change-pin', (req, res) => {
 });
 
 // Verify Account
-app.post('/webhook/library-verify-account', (req, res) => {
+//app.post('/webhook/library-verify-account', (req, res) => {
+ // return res.status(200).json({
+   // success: true,
+   // message: 'Account verified'
+//  });
+//});
+// Login / Auth Route
+app.post('/webhook/library-auth', (req, res) => {
+  console.log('Login attempt received:', req.body);
+
   return res.status(200).json({
     success: true,
-    message: 'Account verified'
+    authenticated: true,
+    message: 'Authenticated successfully',
+    user: {
+      name: req.body.userId || 'Resident',
+      role: 'user'
+    },
+    token: 'mock-jwt-token-12345'
   });
 });
 
