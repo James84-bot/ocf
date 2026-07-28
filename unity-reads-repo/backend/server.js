@@ -2,31 +2,33 @@ const express = require('express');
 const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
-
-// Enable CORS for your GitHub Pages site
+// 1. Enable CORS for all origins
 app.use(cors({
-  origin: ['https://james84-bot.github.io'],
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// 2. Handle preflight OPTIONS requests for all endpoints
 app.options('*', cors());
 
-// Define routes matching app.js
-app.post('/webhook/library-auth', (req, res) => {
-  console.log('Login payload received:', req.body);
-  return res.status(200).json({ status: 'success', message: 'Auth successful' });
-});
+// 3. Body parsers
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+// 4. Registration route
 app.post('/webhook/library-registration', (req, res) => {
-  return res.status(200).json({ status: 'success', message: 'Registration successful' });
+  console.log('Registration request received:', req.body);
+  return res.status(200).json({
+    status: 'success',
+    message: 'Registered successfully',
+    user: req.body
+  });
 });
 
-app.get('/webhook/library-sync', (req, res) => {
-  return res.status(200).json({ status: 'success', catalog: [] });
+// Port binding for Railway
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
-
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
