@@ -1,18 +1,15 @@
 // =========================================================================
 // 1. APPLICATION SETUP AND ENDPOINTS
 // =========================================================================
-const CONFIG = {
-    N8N_LOGIN_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-auth",
-    N8N_REGISTER_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-registration",
-    N8N_SYNC_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-sync",
-    N8N_TRANSACTION_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-update",
-    N8N_CHANGE_PIN_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-change-pin",
-    N8N_VERIFY_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-verify-account",
-    N8N_RESERVE_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-reserve",
-    N8N_CANCEL_RESERVATION_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-cancel-reservation",
-    N8N_ADMIN_OVERVIEW_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-admin-overview",
-    DATABASE_LOCAL_KEY: "unity_hub_circulation_state_v1"
-};
+N8N_LOGIN_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-auth",
+  N8N_REGISTER_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-registration",
+  N8N_SYNC_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-sync",
+  N8N_TRANSACTION_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-update",
+  N8N_CHANGE_PIN_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-change-pin",
+  N8N_VERIFY_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-verify-account",
+  N8N_RESERVE_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-reserve",
+  N8N_CANCEL_RESERVATION_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-cancel-reservation",
+  N8N_ADMIN_OVERVIEW_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-admin-overview",
 
 // Fallback titles if system cannot connect to the network initially.
 // Multi-copy model: each title has a `copies` array — one entry per
