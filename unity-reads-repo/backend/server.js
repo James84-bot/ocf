@@ -1,20 +1,32 @@
-require('dotenv').config();
-const { createApp } = require('./src/app');
-const { openDatabase } = require('./src/db');
+const express = require('express');
+const cors = require('cors');
 
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'replace-this-with-a-long-random-string') {
-    console.error(
-        '\nJWT_SECRET is missing or still set to the placeholder value.\n' +
-        'Copy .env.example to .env and set a real one:\n' +
-        '  node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"\n'
-    );
-    process.exit(1);
-}
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const db = openDatabase(process.env.DATABASE_PATH || './data/unity_shelf.db');
-const app = createApp(db);
+app.use(express.json());
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-    console.log(`Unity Shelf backend running at http://localhost:${port}`);
+// Enable CORS for your GitHub Pages site
+app.use(cors({
+  origin: ['https://james84-bot.github.io'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.options('*', cors());
+
+// Define routes matching app.js
+app.post('/webhook/library-auth', (req, res) => {
+  console.log('Login payload received:', req.body);
+  return res.status(200).json({ status: 'success', message: 'Auth successful' });
 });
+
+app.post('/webhook/library-registration', (req, res) => {
+  return res.status(200).json({ status: 'success', message: 'Registration successful' });
+});
+
+app.get('/webhook/library-sync', (req, res) => {
+  return res.status(200).json({ status: 'success', catalog: [] });
+});
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
