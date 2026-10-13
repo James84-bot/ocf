@@ -63,6 +63,22 @@ const cancelReservationSchema = z.object({
     reservationId: z.string().min(1)
 });
 
+// Library Assistant catalogue tools (routes/admin.js).
+const addTitleSchema = z.object({
+    title: z.string().trim().min(1).max(200),
+    author: z.string().trim().min(1).max(120),
+    ageBracket: z.enum(['Adults', 'Kids']),
+    grade: z.string().trim().max(20).optional().or(z.literal('')),
+    isbn: z.string().trim().max(20).optional().or(z.literal('')),
+    branch: z.string().trim().min(1).max(80),
+    copies: z.number().int().min(1).max(50)
+});
+
+const assignBranchSchema = z.object({
+    branch: z.string().trim().min(1).max(80),
+    titleId: z.string().trim().min(1).optional() // omit to assign every unassigned copy
+});
+
 function validateBody(schema) {
     return (req, res, next) => {
         const result = schema.safeParse(req.body);
@@ -78,6 +94,7 @@ function validateBody(schema) {
 }
 
 module.exports = {
+    addTitleSchema, assignBranchSchema,
     loginSchema, registrationSchema, verifySchema, changePinSchema,
     syncSchema, transactionSchema, reserveSchema, cancelReservationSchema,
     validateBody

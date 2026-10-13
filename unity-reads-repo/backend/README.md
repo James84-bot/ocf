@@ -43,12 +43,23 @@ not a mitigation, it's an actual close of that race condition.
 - **A seed script** that imports your actual inventory spreadsheet
   directly into SQLite (`npm run seed`) — see below.
 
-**Honest gaps, not addressed here:** no admin UI for adding new titles or
-roster entries (edit the database directly, or build one — `src/db.js`
-is the only file that would need to change if you swap SQLite for
-Postgres later); no real scheduled job for reservation expiry (checked
-lazily, see below); the ~1,000-line frontend `app.js` is still one file;
-no error-tracking service (Sentry or similar) wired in.
+**Also in this version:**
+- **Your own branding and rules** from environment variables (`src/settings.js`, see
+  `.env.example`): name, logo, accent colour, branches, labels, staff email domain, loan
+  period, fine, currency, suspension threshold and hold window. Served to the frontend at
+  `GET /api/settings`. Defaults reproduce the original Unity Homes setup.
+- **Catalogue tools for Library Assistants:** add a title with copies, place unassigned (`TBD`)
+  copies at a branch one title at a time or all at once, and export loans or the catalogue as
+  CSV (formula-safe for Excel and Sheets).
+- **Branch check at sign-up:** a member can only register at a branch the organisation has.
+- **Reservation-ready notices** are actually sent now (email or SMS, or the console fallback),
+  and hold expiry also runs on a five-minute timer, not only when someone opens the app.
+- **One-server mode:** the backend serves the frontend too (`SERVE_FRONTEND`), so Docker or a
+  single Node host runs the whole library at one URL.
+
+**Remaining gaps:** no screen yet for editing or deleting an existing title (edit the database,
+or re-seed from the spreadsheet); no member-management screen beyond the overview; the
+frontend `app.js` is still one file; no error-tracking service wired in.
 
 ## How reservations work
 
@@ -63,10 +74,8 @@ no error-tracking service (Sentry or similar) wired in.
    next time they try to "borrow" that title, since the route recognizes
    the hold is theirs. If they don't claim it in time, the hold expires,
    and the next person in the queue (if any) gets offered the same hold.
-5. Expiry is checked lazily, at the top of the sync/reserve/admin-overview
-   requests, rather than via a real cron job (no background scheduler in
-   this deployment). Fine at this scale; worth a proper scheduled job if
-   this ever needs to be exact-to-the-minute.
+5. Expiry runs every five minutes on a timer in `server.js`, and again at
+   the top of the sync/reserve/admin-overview requests.
 
 ## 1. Install dependencies
 
@@ -137,11 +146,13 @@ Visit `http://localhost:3000/health` — you should get
 
 ## 5. Point the frontend at this backend
 
-Nothing to change — `app.js`'s `CONFIG` block already points at
-`http://localhost:3000/webhook/...`, matching every route this backend
-serves exactly. Serve `index.html`/`app.js`/`styles.css` with VS Code's
-Live Server (or any static file server) and it'll talk to this backend
-directly.
+With `SERVE_FRONTEND=true` (the default) there's nothing to do: open
+`http://localhost:3000` and the backend serves the site itself.
+
+If the frontend is hosted somewhere else, set the backend's URL in
+`frontend/config.js`. It already handles the two original cases: GitHub
+Pages talks to the Railway backend, and VS Code Live Server (port 5500)
+talks to `http://localhost:3000`.
 
 ## Running the tests
 

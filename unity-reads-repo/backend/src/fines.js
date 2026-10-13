@@ -1,10 +1,15 @@
-// Mirrors evaluateLoanMetrics() in the frontend's app.js exactly (21-day
-// grace period, KSH 50/day fine, lock at 14 days overdue). The frontend
+// Mirrors evaluateLoanMetrics() in the frontend's app.js. The rules (loan
+// period, fine per day, suspension threshold) come from src/settings.js, so
+// each organisation sets its own; defaults are 21 days, KSH 50/day, lock
+// at 14 days overdue. The frontend
 // computes this for its own optimistic UI, but a user could bypass that by
 // calling the API directly — so the borrow route re-derives this itself
 // from the database rather than trusting anything the client says about
 // its own fine status.
+const { getSettings } = require('./settings');
+
 function evaluateLoanMetrics(borrowedAtIso, now = new Date()) {
+    const { loanDays, finePerDay, suspendAfterDays } = getSettings();
     const borrowDate = new Date(borrowedAtIso);
     const daysElapsed = Math.floor((now - borrowDate) / (1000 * 60 * 60 * 24));
 
@@ -12,10 +17,10 @@ function evaluateLoanMetrics(borrowedAtIso, now = new Date()) {
     let fine = 0;
     let lockAccount = false;
 
-    if (daysElapsed > 21) {
+    if (daysElapsed > loanDays) {
         status = 'OVERDUE';
-        fine = (daysElapsed - 21) * 50;
-        if ((daysElapsed - 21) >= 14) {
+        fine = (daysElapsed - loanDays) * finePerDay;
+        if ((daysElapsed - loanDays) >= suspendAfterDays) {
             lockAccount = true;
             status = 'SUSPENDED';
         }
