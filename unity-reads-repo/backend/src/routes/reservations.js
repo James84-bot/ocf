@@ -3,8 +3,10 @@ const { validateBody, reserveSchema, cancelReservationSchema } = require('../val
 const { requireAuth } = require('../auth');
 const { sendReservationReady } = require('../notify');
 const { asyncRoute } = require('../middleware/errorHandler');
+const { getSettings } = require('../settings');
 
-const HOLD_HOURS = 48;
+// Claim window for a held copy; configurable per organisation (HOLD_HOURS, default 48).
+const holdHours = () => getSettings().holdHours;
 
 // When a copy of (titleId, branch) becomes free — either a fresh return,
 // or an expired hold being reclaimed — this decides what happens to it:
@@ -26,18 +28,29 @@ function promoteNextReservation(db, titleId, branch, copyId) {
     }
 
     const readyAt = new Date();
-    const expiresAt = new Date(readyAt.getTime() + HOLD_HOURS * 60 * 60 * 1000);
+    const expiresAt = new Date(readyAt.getTime() + holdHours() * 60 * 60 * 1000);
     db.prepare(`UPDATE reservations SET status = 'READY', ready_at = ?, expires_at = ? WHERE id = ?`)
         .run(readyAt.toISOString(), expiresAt.toISOString(), next.id);
     db.prepare(`UPDATE copies SET status = 'RESERVED' WHERE copy_id = ?`).run(copyId);
+
+    // Tell the member their copy is waiting. Deferred with setImmediate so the
+    // message goes out after the surrounding transaction has committed, and a
+    // provider outage can never roll back the hold itself.
+    const user = db.prepare(`SELECT user_id AS userId, account_type AS accountType, phone FROM users WHERE user_id = ?`).get(next.user_id);
+    const title = db.prepare(`SELECT title FROM titles WHERE id = ?`).get(titleId);
+    if (user && title) {
+        setImmediate(() => {
+            sendReservationReady(user, title.title, branch, holdHours())
+                .catch(err => console.error('Could not send reservation-ready notice:', err.message));
+        });
+    }
     return next;
 }
 
-// Reservation expiry has no real cron job behind it (no background
-// scheduler in this deployment) — it's checked lazily at the top of
-// sync/reserve requests instead. Fine at this scale; worth a proper
-// scheduled job if this ever needs to be exact-to-the-minute rather than
-// "checked the next time someone opens the app."
+// Expires holds nobody collected in time and passes the copy to the next
+// person in the queue. Runs on a timer in server.js (every few minutes) and
+// also at the top of sync/reserve/admin requests, so it's never stale for
+// long even if the timer is delayed.
 function expireStaleReservations(db) {
     const nowIso = new Date().toISOString();
     const stale = db.prepare(`SELECT * FROM reservations WHERE status = 'READY' AND expires_at < ?`).all(nowIso);
@@ -116,4 +129,4 @@ module.exports = function reservationRoutes(db) {
 
 module.exports.promoteNextReservation = promoteNextReservation;
 module.exports.expireStaleReservations = expireStaleReservations;
-module.exports.HOLD_HOURS = HOLD_HOURS;
+module.exports.holdHours = holdHours;

@@ -1,18 +1,114 @@
 // =========================================================================
 // 1. APPLICATION SETUP AND ENDPOINTS
 // =========================================================================
+// The API base URL comes from config.js (empty = same server as this page).
+const API_BASE = (window.UNITY_SHELF_API || '').replace(/\/$/, '');
+const api = (path) => `${API_BASE}${path}`;
 const CONFIG = {
-  N8N_LOGIN_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-auth",
-  N8N_REGISTER_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-registration",
-  N8N_SYNC_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-sync",
-  N8N_TRANSACTION_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-update",
-  N8N_CHANGE_PIN_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-change-pin",
-  N8N_VERIFY_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-verify-account",
-  N8N_RESERVE_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-reserve",
-  N8N_CANCEL_RESERVATION_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-cancel-reservation",
-  N8N_ADMIN_OVERVIEW_WEBHOOK: "https://ocf-production.up.railway.app/webhook/library-admin-overview",
+  N8N_LOGIN_WEBHOOK: api('/webhook/library-auth'),
+  N8N_REGISTER_WEBHOOK: api('/webhook/library-registration'),
+  N8N_SYNC_WEBHOOK: api('/webhook/library-sync'),
+  N8N_TRANSACTION_WEBHOOK: api('/webhook/library-update'),
+  N8N_CHANGE_PIN_WEBHOOK: api('/webhook/library-change-pin'),
+  N8N_VERIFY_WEBHOOK: api('/webhook/library-verify-account'),
+  N8N_RESERVE_WEBHOOK: api('/webhook/library-reserve'),
+  N8N_CANCEL_RESERVATION_WEBHOOK: api('/webhook/library-cancel-reservation'),
+  N8N_ADMIN_OVERVIEW_WEBHOOK: api('/webhook/library-admin-overview'),
+  ADMIN_UNASSIGNED: api('/webhook/library-admin-unassigned'),
+  ADMIN_ASSIGN_BRANCH: api('/webhook/library-admin-assign-branch'),
+  ADMIN_ADD_TITLE: api('/webhook/library-admin-add-title'),
+  ADMIN_EXPORT: (kind) => api(`/webhook/library-admin-export/${kind}`),
+  SETTINGS: api('/api/settings'),
   DATABASE_LOCAL_KEY: "unity_hub_circulation_state_v1"
 };
+
+// Escape anything that came from data (titles, names, branches) before it goes
+// into innerHTML. Member names are typed by members, so without this a "name"
+// containing markup would run as code on the Library Assistant's screen.
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+// For values placed inside a quoted JS string in an onclick="" attribute.
+function jsq(value) {
+    return esc(String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+}
+
+// Organisation settings (name, branches, lending rules). Loaded from the
+// server at start-up; these defaults match the original Unity Homes setup and
+// are used if the server can't be reached.
+let SETTINGS = {
+    orgName: 'Unity Homes', libraryName: 'Knowledge Hub',
+    tagline: 'A shared shelf for every Unity Homes estate.',
+    intro: 'Borrow a book, pass it on, and meet your neighbours in between.',
+    logoUrl: 'logo-mark.png', accentColor: '',
+    branches: ['Unity One', 'Unity West', 'Unity East', 'Unity Gardens', 'Silver Hill', 'Unity Parkside'],
+    branchLabel: 'Estate', memberLabel: 'Resident', unitLabel: 'Unit Number',
+    staffEmailDomain: 'unityhomes.co.ke',
+    loanDays: 21, finePerDay: 50, currency: 'KSH', suspendAfterDays: 14, holdHours: 48
+};
+
+async function loadSettings() {
+    try {
+        // Don't hold the page up for long if the server is slow or asleep.
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3000);
+        const response = await fetch(CONFIG.SETTINGS, { signal: controller.signal });
+        clearTimeout(timer);
+        if (response.ok) SETTINGS = { ...SETTINGS, ...(await response.json()) };
+    } catch (error) {
+        // offline: keep the defaults above
+    }
+    applySettings();
+}
+
+// Puts the organisation's name, branches and rules into the page.
+function applySettings() {
+    const s = SETTINGS;
+    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    document.title = `${s.libraryName} | ${s.orgName}`;
+    setText('brand-name', s.libraryName);
+    const logo = document.getElementById('brand-logo');
+    if (logo) { if (s.logoUrl) { logo.src = s.logoUrl; logo.style.display = ''; } else { logo.removeAttribute('src'); logo.style.display = 'none'; } }
+    if (s.accentColor) {
+        // One accent colour drives buttons, highlights and tints.
+        const n = parseInt(s.accentColor.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, bl = n & 255;
+        const dark = (c) => Math.round(c * 0.85);
+        const root = document.documentElement.style;
+        root.setProperty('--uh-red', s.accentColor);
+        root.setProperty('--uh-red-rgb', `${r}, ${g}, ${bl}`);
+        root.setProperty('--uh-red-hover', `rgb(${dark(r)}, ${dark(g)}, ${dark(bl)})`);
+    }
+    setText('footer-text', `\u00A9 ${new Date().getFullYear()} ${s.libraryName}, ${s.orgName}.`);
+    applyLoginViewSettings();
+}
+
+// The login view is re-created from its template on every visit, so its
+// branded text is filled in each time it's shown.
+function applyLoginViewSettings() {
+    const s = SETTINGS;
+    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    setText('brand-badge', `A ${s.orgName} community library`);
+    setText('brand-tagline', s.tagline);
+    setText('brand-intro', s.intro);
+    setText('branch-label', s.branchLabel);
+    setText('unit-label', s.unitLabel);
+    setText('member-option', `${s.orgName} ${s.memberLabel}`);
+    setText('staff-domain-tag', `[@${s.staffEmailDomain}]`);
+    const workEmail = document.getElementById('signup-work-email');
+    if (workEmail) workEmail.placeholder = `you@${s.staffEmailDomain}`;
+    const select = document.getElementById('signup-estate');
+    if (select) {
+        select.innerHTML = `<option value="" disabled selected>Select your ${esc(s.branchLabel.toLowerCase())}</option>` +
+            s.branches.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
+    }
+    const rules = document.getElementById('rules-text');
+    if (rules) {
+        rules.innerHTML = `Books can be borrowed free of charge for up to <strong>${s.loanDays} days</strong>. Returning a book late will attract a fine of <strong class="penalty-highlight">${esc(s.currency)} ${s.finePerDay} per day</strong>. Accounts with fines overdue by more than ${s.suspendAfterDays} days will be temporarily suspended.`;
+    }
+    setText('perk-access', `Access is for ${s.orgName} ${s.memberLabel.toLowerCase()}s and staff.`);
+    setText('perk-branches', s.branches.length > 1 ? `Shared across ${s.branches.slice(0, -1).join(', ')} and ${s.branches[s.branches.length - 1]}.` : `Based at ${s.branches[0] || s.orgName}.`);
+}
+
 // Fallback titles if system cannot connect to the network initially.
 // Multi-copy model: each title has a `copies` array — one entry per
 // physical copy, each tied to a branch (Unity West / Unity East / Unity
@@ -261,7 +357,15 @@ window.handleRegistrationAttempt = async function(event) {
     const estateSelectValue = document.getElementById('signup-estate').value;
     const accountTypeInput = document.getElementById('signup-affiliation').value;
     const nameInput = document.getElementById('signup-name').value.trim();
-    const pinInput = "1234"; // Default security pin assigned initially
+    // Members choose their own PIN. (Earlier versions gave every new account
+    // PIN 1234, so anyone who knew a member's phone number could log in.)
+    const pinInput = (document.getElementById('signup-pin')?.value || '').trim();
+    const pinConfirm = (document.getElementById('signup-pin-confirm')?.value || '').trim();
+    if (!/^[0-9]{4,6}$/.test(pinInput)) { showToast("❌ Choose a PIN of 4 to 6 digits."); return; }
+    if (pinInput !== pinConfirm) { showToast("❌ The two PINs don't match."); return; }
+    if (/^(\d)\1+$/.test(pinInput) || '0123456789'.includes(pinInput) || '9876543210'.includes(pinInput)) {
+        showToast("❌ That PIN is too easy to guess. Avoid repeated or sequential digits."); return;
+    }
 
     const isStaffLike = accountTypeInput === 'Staff' || accountTypeInput === 'Library Assistant';
     // Staff and Library Assistant accounts work across every branch, so
@@ -276,8 +380,8 @@ window.handleRegistrationAttempt = async function(event) {
 
     if (isStaffLike) {
         workEmailInput = document.getElementById('signup-work-email').value.trim().toLowerCase();
-        if (!workEmailInput.endsWith('@unityhomes.co.ke')) {
-            showToast(`❌ ${accountTypeInput} accounts require a work email ending in @unityhomes.co.ke.`);
+        if (!workEmailInput.endsWith(`@${SETTINGS.staffEmailDomain}`)) {
+            showToast(`❌ ${accountTypeInput} accounts require a work email ending in @${SETTINGS.staffEmailDomain}.`);
             return;
         }
         userIdInput = workEmailInput;
@@ -297,7 +401,7 @@ window.handleRegistrationAttempt = async function(event) {
             registeredAt: new Date().toISOString()
         };
 
-        // Post registration fields to n8n database sheet writer
+        // Send the registration to the backend
         const response = await fetch(CONFIG.N8N_REGISTER_WEBHOOK, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -540,7 +644,7 @@ async function fetchRemoteIndexData() {
     configureLayoutVisibility();
 }
 
-// Transmits fine metrics, returns, and borrow transactions straight out to Google Sheets.
+// Sends borrow and return transactions to the backend.
 // Returns { ok: true } on success, { ok: false, conflict: true, message } when the server
 // actively rejected the request (e.g. book already taken), or { ok: false, conflict: false }
 // when it's a genuine network failure that should fall back to offline queueing.
@@ -573,7 +677,8 @@ async function transmitTransactionPayload(eventAction, dataContext) {
 // 5. LOAN TIMELINE INTEREST METRICS
 // =========================================================================
 
-// Computes if a book is overdue and handles the KSH 50 daily fine logic
+// Computes if a book is overdue and its fine, using the organisation's rules
+// (SETTINGS). The server applies the same rules and is the one that enforces them.
 function evaluateLoanMetrics(borrowedAtStr) {
     const borrowDate = new Date(borrowedAtStr);
     const currentDate = new Date();
@@ -584,11 +689,11 @@ function evaluateLoanMetrics(borrowedAtStr) {
     let fine = 0;
     let lockAccount = false;
 
-    // Standard 21-day calculation check
-    if (daysElapsed > 21) {
+    const { loanDays, finePerDay, suspendAfterDays } = SETTINGS;
+    if (daysElapsed > loanDays) {
         status = 'OVERDUE';
-        fine = (daysElapsed - 21) * 50; 
-        if ((daysElapsed - 21) >= 14) {
+        fine = (daysElapsed - loanDays) * finePerDay;
+        if ((daysElapsed - loanDays) >= suspendAfterDays) {
             lockAccount = true;
             status = 'SUSPENDED';
         }
@@ -640,9 +745,9 @@ async function initHeroSlider() {
         return `
             <div class="hero-slide hero-slide-bg-${i % 4} ${i === 0 ? 'active' : ''}" data-slide-index="${i}">
                 <i class="fas ${icons[i % icons.length]} hero-slide-icon"></i>
-                <p class="hero-slide-title">${t.title}</p>
-                <p class="hero-slide-meta">By ${t.author}</p>
-                <span class="hero-slide-tag">${tag}</span>
+                <p class="hero-slide-title">${esc(t.title)}</p>
+                <p class="hero-slide-meta">By ${esc(t.author)}</p>
+                <span class="hero-slide-tag">${esc(tag)}</span>
             </div>
         `;
     }).join('');
@@ -688,6 +793,7 @@ const router = {
         try {
             if (view === 'login') {
                 initAuthToggleCard();
+                applyLoginViewSettings();
             }
             if (view === 'catalog') {
                 injectShimmerState('catalog-list', 3);
@@ -703,6 +809,7 @@ const router = {
             }
             if (view === 'admin') {
                 compileAdminDisplayBlock();
+                compileAdminCatalogTools();
             }
         } catch (renderError) {
             console.error(`Unity Reads: render error while navigating to "${view}"`, renderError);
@@ -764,8 +871,8 @@ function compileCatalogDisplayBlock() {
     const renderCard = (t) => {
         const anyAvailable = titleHasAvailableCopy(t);
         const iconStats = [
-            t.ageBracket ? `<span class="icon-stat"><i class="fas fa-users"></i> ${t.ageBracket}</span>` : '',
-            t.grade ? `<span class="icon-stat"><i class="fas fa-graduation-cap"></i> Grade ${t.grade}</span>` : ''
+            t.ageBracket ? `<span class="icon-stat"><i class="fas fa-users"></i> ${esc(t.ageBracket)}</span>` : '',
+            t.grade ? `<span class="icon-stat"><i class="fas fa-graduation-cap"></i> Grade ${esc(t.grade)}</span>` : ''
         ].filter(Boolean).join('');
 
         // One row per branch that holds a copy of this title, with a Borrow
@@ -782,8 +889,8 @@ function compileCatalogDisplayBlock() {
             if (summary.available > 0) {
                 return `
                     <div class="branch-copy-row">
-                        <span class="branch-copy-label">${branch}: ${summary.available}/${summary.total} available</span>
-                        <button onclick="processBorrowTransaction('${t.id}', '${branch}')" class="branch-borrow-btn">Borrow</button>
+                        <span class="branch-copy-label">${esc(branch)}: ${summary.available}/${summary.total} available</span>
+                        <button onclick="processBorrowTransaction('${jsq(t.id)}', '${jsq(branch)}')" class="branch-borrow-btn">Borrow</button>
                     </div>
                 `;
             }
@@ -791,15 +898,15 @@ function compileCatalogDisplayBlock() {
             const myReservation = (AppState.reservations || []).find(r => r.title_id === t.id && r.branch === branch);
             let rightSide;
             if (myReservation && myReservation.status === 'READY') {
-                rightSide = `<button onclick="processBorrowTransaction('${t.id}', '${branch}')" class="branch-borrow-btn">Claim Hold</button>`;
+                rightSide = `<button onclick="processBorrowTransaction('${jsq(t.id)}', '${jsq(branch)}')" class="branch-borrow-btn">Claim Hold</button>`;
             } else if (myReservation) {
                 rightSide = `<span class="branch-copy-none">On your waitlist</span>`;
             } else {
-                rightSide = `<button onclick="processReserveTransaction('${t.id}', '${branch}')" class="branch-reserve-btn">Reserve</button>`;
+                rightSide = `<button onclick="processReserveTransaction('${jsq(t.id)}', '${jsq(branch)}')" class="branch-reserve-btn">Reserve</button>`;
             }
             return `
                 <div class="branch-copy-row">
-                    <span class="branch-copy-label">${branch}: 0/${summary.total} available</span>
+                    <span class="branch-copy-label">${esc(branch)}: 0/${summary.total} available</span>
                     ${rightSide}
                 </div>
             `;
@@ -808,8 +915,8 @@ function compileCatalogDisplayBlock() {
         return `
             <div class="catalog-item-card">
                 <div>
-                    <h4 class="auth-title">${t.title}</h4>
-                    <p class="text-xs text-secondary" style="margin-top: 0.15rem;">By ${t.author}</p>
+                    <h4 class="auth-title">${esc(t.title)}</h4>
+                    <p class="text-xs text-secondary" style="margin-top: 0.15rem;">By ${esc(t.author)}</p>
                     ${iconStats ? `<div class="icon-stat-row">${iconStats}</div>` : ''}
                     <span class="status-badge-node ${anyAvailable ? 'status-available' : 'status-loaned'}">
                         ${anyAvailable ? 'AVAILABLE' : 'ALL ON LOAN'}
@@ -834,7 +941,7 @@ function compileCatalogDisplayBlock() {
                 ${items.length > 0
                     ? `<div class="catalog-subsection-grid">${visible.map(renderCard).join('')}</div>`
                     : `<p class="catalog-subsection-empty">No ${label.toLowerCase()} titles in this view.</p>`}
-                ${hasMore ? `<div class="catalog-show-more-wrap"><button onclick="expandCatalogSubsection('${label}')" class="btn btn-uh-secondary">Show More (${items.length - visible.length} remaining)</button></div>` : ''}
+                ${hasMore ? `<div class="catalog-show-more-wrap"><button onclick="expandCatalogSubsection('${jsq(label)}')" class="btn btn-uh-secondary">Show More (${items.length - visible.length} remaining)</button></div>` : ''}
             </div>
         `;
     };
@@ -888,8 +995,8 @@ function compileTrendingBlock() {
         <div class="trending-card">
             <i class="fas fa-fire trending-icon"></i>
             <div>
-                <p class="trending-title">${b.title}</p>
-                <p class="text-xs text-secondary">${b.author ? `By ${b.author} · ` : ''}Borrowed ${b.timesBorrowed}× total</p>
+                <p class="trending-title">${esc(b.title)}</p>
+                <p class="text-xs text-secondary">${b.author ? `By ${esc(b.author)} · ` : ''}Borrowed ${b.timesBorrowed}× total</p>
             </div>
         </div>
     `).join('');
@@ -939,16 +1046,16 @@ function renderSearchSuggestions(rawQuery) {
         .slice(0, 6);
 
     if (matches.length === 0) {
-        box.innerHTML = `<div class="search-suggestion-empty">No titles or authors match "${rawQuery}"</div>`;
+        box.innerHTML = `<div class="search-suggestion-empty">No titles or authors match "${esc(rawQuery)}"</div>`;
     } else {
         box.innerHTML = matches.map(t => {
             const anyAvailable = (t.copies || []).some(c => c.status === 'AVAILABLE');
             return `
-                <button type="button" class="search-suggestion-item" onclick="selectSearchSuggestion('${t.title.replace(/'/g, "\\'")}')">
+                <button type="button" class="search-suggestion-item" onclick="selectSearchSuggestion('${jsq(t.title)}')">
                     <i class="fas ${anyAvailable ? 'fa-book-open' : 'fa-book'}"></i>
                     <div>
-                        <div class="search-suggestion-title">${t.title}</div>
-                        <div class="search-suggestion-meta">By ${t.author} — ${anyAvailable ? 'Available' : 'All on loan'}</div>
+                        <div class="search-suggestion-title">${esc(t.title)}</div>
+                        <div class="search-suggestion-meta">By ${esc(t.author)} — ${anyAvailable ? 'Available' : 'All on loan'}</div>
                     </div>
                 </button>
             `;
@@ -1065,7 +1172,7 @@ function compileDashboardDisplayBlock() {
 
     if (matchedLoans.length === 0) {
         listGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; font-size: 0.85rem; color: var(--text-secondary); padding: 3rem 0; font-style: italic;">You do not have any borrowed books right now.</p>`;
-        dynamicBalanceBadge.innerHTML = "Total Balance: <span style='color: var(--text-dark)'>KSH 0</span>";
+        dynamicBalanceBadge.innerHTML = `Total Balance: <span style='color: var(--text-dark)'>${esc(SETTINGS.currency)} 0</span>`;
         return;
     }
 
@@ -1088,18 +1195,18 @@ function compileDashboardDisplayBlock() {
             <div class="auth-card" style="${trackingBorderColor}">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
                     <div>
-                        <h4 class="auth-title">${loan.book_title}</h4>
-                        <p class="text-xs text-secondary" style="margin-top: 0.25rem;">${loan.branch ? `${loan.branch} · ` : ''}Borrowed for: <strong>${structuralMetrics.daysElapsed} days</strong></p>
+                        <h4 class="auth-title">${esc(loan.book_title)}</h4>
+                        <p class="text-xs text-secondary" style="margin-top: 0.25rem;">${loan.branch ? `${esc(loan.branch)} · ` : ''}Borrowed for: <strong>${structuralMetrics.daysElapsed} days</strong></p>
                     </div>
                     ${statusNoticeString}
                 </div>
-                ${structuralMetrics.fine > 0 ? `<div style="margin-top: 0.75rem; font-size: 0.8rem; font-weight: 700; color: var(--uh-red);">Accrued Fine: KSH ${structuralMetrics.fine}</div>` : ''}
-                <button onclick="processReturnTransaction('${loan.id}', '${loan.copy_id}')" class="btn btn-uh-secondary btn-w-full text-xs">Return Book</button>
+                ${structuralMetrics.fine > 0 ? `<div style="margin-top: 0.75rem; font-size: 0.8rem; font-weight: 700; color: var(--uh-red);">Accrued Fine: ${esc(SETTINGS.currency)} ${structuralMetrics.fine}</div>` : ''}
+                <button onclick="processReturnTransaction('${jsq(loan.id)}', '${jsq(loan.copy_id)}')" class="btn btn-uh-secondary btn-w-full text-xs">Return Book</button>
             </div>
         `;
     }).join('');
 
-    dynamicBalanceBadge.innerHTML = `Total Outstanding Balance: <span style="color: ${aggregateSystemFine > 0 ? 'var(--uh-red)' : 'var(--text-dark)'}; font-weight: 800;">KSH ${aggregateSystemFine}</span>`;
+    dynamicBalanceBadge.innerHTML = `Total Outstanding Balance: <span style="color: ${aggregateSystemFine > 0 ? 'var(--uh-red)' : 'var(--text-dark)'}; font-weight: 800;">${esc(SETTINGS.currency)} ${aggregateSystemFine}</span>`;
 }
 
 // Processes a book return transaction — finds the specific copy (by
@@ -1187,14 +1294,14 @@ function compileReservationsBlock() {
         return `
             <div class="auth-card reservation-card ${isReady ? 'reservation-ready' : ''}">
                 <div>
-                    <h4 class="auth-title">${r.book_title}</h4>
-                    <p class="text-xs text-secondary" style="margin-top: 0.15rem;">${r.branch}</p>
+                    <h4 class="auth-title">${esc(r.book_title)}</h4>
+                    <p class="text-xs text-secondary" style="margin-top: 0.15rem;">${esc(r.branch)}</p>
                     <span class="status-badge-node ${isReady ? 'status-available' : 'status-loaned'}">
                         ${isReady ? 'READY FOR PICKUP' : 'WAITING IN QUEUE'}
                     </span>
                     ${isReady ? `<p class="text-xs text-secondary" style="margin-top: 0.4rem;">Held until ${new Date(r.expires_at).toLocaleString()}</p>` : ''}
                 </div>
-                <button onclick="processCancelReservation('${r.id}')" class="btn btn-uh-secondary btn-w-full text-xs">Cancel Reservation</button>
+                <button onclick="processCancelReservation('${jsq(r.id)}')" class="btn btn-uh-secondary btn-w-full text-xs">Cancel Reservation</button>
             </div>
         `;
     }).join('');
@@ -1255,6 +1362,7 @@ async function compileAdminDisplayBlock() {
             <div class="stat-item"><span class="stat-number">${result.activeReservations.length}</span><span class="stat-label">Active Reservations</span></div>
             <div class="stat-item"><span class="stat-number">${result.totalMembers}</span><span class="stat-label">Total Members</span></div>
             <div class="stat-item"><span class="stat-number">${result.pendingVerifications}</span><span class="stat-label">Pending Verification</span></div>
+            ${result.unassignedCopies ? `<div class="stat-item"><span class="stat-number">${result.unassignedCopies}</span><span class="stat-label">Copies Without a Branch</span></div>` : ''}
         `;
 
         loansNode.innerHTML = result.activeLoans.length === 0
@@ -1263,11 +1371,11 @@ async function compileAdminDisplayBlock() {
                 <thead><tr><th>Book</th><th>Borrower</th><th>Branch</th><th>Days Out</th><th></th></tr></thead>
                 <tbody>${result.activeLoans.map(l => `
                     <tr class="${l.overdue ? 'admin-row-overdue' : ''}">
-                        <td>${l.book_title}</td>
-                        <td>${l.borrowerName}<br><span class="text-xs text-secondary">${l.borrowerEstate}</span></td>
-                        <td>${l.branch}</td>
+                        <td>${esc(l.book_title)}</td>
+                        <td>${esc(l.borrowerName)}<br><span class="text-xs text-secondary">${esc(l.borrowerEstate)}</span></td>
+                        <td>${esc(l.branch)}</td>
                         <td>${l.daysElapsed}${l.overdue ? ' <span class="admin-overdue-tag">OVERDUE</span>' : ''}</td>
-                        <td><button onclick="processAdminMarkReturned('${l.id}', '${l.copy_id}')" class="branch-borrow-btn">Mark Returned</button></td>
+                        <td><button onclick="processAdminMarkReturned('${jsq(l.id)}', '${jsq(l.copy_id)}')" class="branch-borrow-btn">Mark Returned</button></td>
                     </tr>
                 `).join('')}</tbody>
             </table>`;
@@ -1278,9 +1386,9 @@ async function compileAdminDisplayBlock() {
                 <thead><tr><th>Book</th><th>Requested By</th><th>Branch</th><th>Status</th></tr></thead>
                 <tbody>${result.activeReservations.map(r => `
                     <tr>
-                        <td>${r.book_title}</td>
-                        <td>${r.requesterName}</td>
-                        <td>${r.branch}</td>
+                        <td>${esc(r.book_title)}</td>
+                        <td>${esc(r.requesterName)}</td>
+                        <td>${esc(r.branch)}</td>
                         <td><span class="status-badge-node ${r.status === 'READY' ? 'status-available' : 'status-loaned'}">${r.status}</span></td>
                     </tr>
                 `).join('')}</tbody>
@@ -1289,6 +1397,123 @@ async function compileAdminDisplayBlock() {
         showToast("❌ Could not reach the server for the admin overview.");
     }
 }
+
+// =========================================================================
+// 7b. LIBRARY ASSISTANT CATALOGUE TOOLS
+// =========================================================================
+
+async function adminPost(url, body) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(body || {})
+    });
+    let result = {};
+    try { result = await response.json(); } catch (e) { /* empty body */ }
+    return { ok: response.ok, result };
+}
+
+function branchOptions(selected) {
+    return SETTINGS.branches.map(b => `<option value="${esc(b)}" ${b === selected ? 'selected' : ''}>${esc(b)}</option>`).join('');
+}
+
+// Fills the Add-a-Book branch list and the "copies without a branch" table.
+async function compileAdminCatalogTools() {
+    document.querySelectorAll('.admin-branch-select').forEach(sel => { sel.innerHTML = branchOptions(SETTINGS.branches[0]); });
+    const label = document.getElementById('admin-branch-label');
+    if (label) label.textContent = SETTINGS.branchLabel;
+
+    const node = document.getElementById('admin-unassigned');
+    if (!node) return;
+    try {
+        const { ok, result } = await adminPost(CONFIG.ADMIN_UNASSIGNED);
+        if (!ok) { node.innerHTML = `<p class="catalog-subsection-empty">${esc(result.message || 'Could not load unassigned copies.')}</p>`; return; }
+        if (!result.titles.length) { node.innerHTML = `<p class="catalog-subsection-empty">Every copy has a ${esc(SETTINGS.branchLabel.toLowerCase())}.</p>`; return; }
+
+        node.innerHTML = `
+            <div class="admin-bulk-row">
+                <span><strong>${result.totalCopies}</strong> copies across <strong>${result.titles.length}</strong> titles. Place all of them at</span>
+                <select class="form-input form-select" id="assign-all-branch">${branchOptions(SETTINGS.branches[0])}</select>
+                <button type="button" class="branch-borrow-btn" onclick="assignUnassigned('', 'assign-all-branch', true)">Place all</button>
+            </div>
+            <table class="admin-table">
+                <thead><tr><th>Book</th><th>Copies</th><th>${esc(SETTINGS.branchLabel)}</th><th></th></tr></thead>
+                <tbody>${result.titles.slice(0, 200).map((t, i) => `
+                    <tr>
+                        <td>${esc(t.title)}<br><span class="text-xs text-secondary">${esc(t.author || '')}</span></td>
+                        <td>${t.copies}</td>
+                        <td><select class="form-input form-select admin-inline-select" id="assign-${i}" aria-label="${esc(SETTINGS.branchLabel)} for ${esc(t.title)}">${branchOptions(SETTINGS.branches[0])}</select></td>
+                        <td><button type="button" class="branch-borrow-btn" onclick="assignUnassigned('${jsq(t.titleId)}', 'assign-${i}')">Place</button></td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+            ${result.titles.length > 200 ? `<p class="text-xs text-secondary admin-help">Showing the first 200 titles. Place them, or use "Place all", to see the rest.</p>` : ''}`;
+    } catch (error) {
+        node.innerHTML = `<p class="catalog-subsection-empty">Could not reach the server.</p>`;
+    }
+}
+
+window.assignUnassigned = async function(titleId, selectId, all) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const branch = select.value;
+    if (all && !confirm(`Place every unassigned copy at ${branch}?`)) return;
+    try {
+        const { ok, result } = await adminPost(CONFIG.ADMIN_ASSIGN_BRANCH, titleId ? { titleId, branch } : { branch });
+        showToast(ok ? `✅ ${result.message}` : `❌ ${result.message || 'Could not place those copies.'}`);
+        if (ok) { compileAdminCatalogTools(); compileAdminDisplayBlock(); fetchRemoteIndexData && fetchRemoteIndexData(); }
+    } catch (error) {
+        showToast("❌ Could not reach the server.");
+    }
+};
+
+window.handleAdminAddTitle = async function(event) {
+    event.preventDefault();
+    const form = event.target;
+    const button = form.querySelector('button[type="submit"]');
+    const data = Object.fromEntries(new FormData(form).entries());
+    const body = {
+        title: data.title.trim(), author: data.author.trim(), ageBracket: data.ageBracket,
+        isbn: (data.isbn || '').trim(), branch: data.branch, copies: Number(data.copies)
+    };
+    if (button) { button.disabled = true; button.textContent = 'Adding...'; }
+    try {
+        const { ok, result } = await adminPost(CONFIG.ADMIN_ADD_TITLE, body);
+        if (ok) {
+            showToast(`✅ ${result.message}`);
+            form.reset();
+            compileAdminCatalogTools();
+            if (typeof fetchRemoteIndexData === 'function') fetchRemoteIndexData();
+        } else {
+            const detail = result.issues && result.issues.length ? ` (${result.issues.map(i => i.path).join(', ')})` : '';
+            showToast(`❌ ${result.message || 'Could not add that book.'}${detail}`);
+        }
+    } catch (error) {
+        showToast("❌ Could not reach the server.");
+    } finally {
+        if (button) { button.disabled = false; button.textContent = 'Add to catalogue'; }
+    }
+};
+
+// Downloads a CSV export. Uses fetch (not a plain link) so the session token
+// goes in the Authorization header rather than the URL.
+window.downloadAdminExport = async function(kind) {
+    try {
+        const response = await fetch(CONFIG.ADMIN_EXPORT(kind), { headers: authHeaders() });
+        if (!response.ok) { showToast("❌ Could not create the export."); return; }
+        const blob = await response.blob();
+        const match = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') || '');
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = match ? match[1] : `${kind}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    } catch (error) {
+        showToast("❌ Could not reach the server.");
+    }
+};
 
 // =========================================================================
 // 8. NOTIFICATION POPUP ALERTS
@@ -1346,5 +1571,10 @@ function initAmbientParallax() {
     }, { passive: true });
 }
 
-document.addEventListener('DOMContentLoaded', () => { initStorageEngine(); router.navigate('catalog'); initAmbientParallax(); });
+document.addEventListener('DOMContentLoaded', async () => {
+    initStorageEngine();
+    await loadSettings();
+    router.navigate('catalog');
+    initAmbientParallax();
+});
 window.router = router;

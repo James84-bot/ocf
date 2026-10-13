@@ -12,6 +12,8 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'replace-this-with-a-l
     process.exit(1);
 }
 
+const { expireStaleReservations } = require('./src/routes/reservations');
+
 const db = openDatabase(process.env.DATABASE_PATH || './data/unity_shelf.db');
 const app = createApp(db);
 
@@ -22,3 +24,10 @@ const port = process.env.PORT || 3000;
 app.listen(port, '0.0.0.0', () => {
     console.log(`Unity Shelf backend running on port ${port}`);
 });
+
+// Hold expiry on a timer, so an uncollected book moves to the next person in
+// the queue even when nobody opens the app. unref() lets the process exit cleanly.
+const SWEEP_MS = 5 * 60 * 1000;
+setInterval(() => {
+    try { expireStaleReservations(db); } catch (err) { console.error('Reservation sweep failed:', err.message); }
+}, SWEEP_MS).unref();

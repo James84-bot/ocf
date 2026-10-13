@@ -3,6 +3,7 @@ const { validateBody, registrationSchema, verifySchema } = require('../validatio
 const { sendVerificationCode } = require('../notify');
 const { authLimiter } = require('../middleware/rateLimiters');
 const { asyncRoute } = require('../middleware/errorHandler');
+const { getSettings } = require('../settings');
 
 function randomOtp() {
     return String(Math.floor(100000 + Math.random() * 900000));
@@ -14,6 +15,7 @@ module.exports = function registrationRoutes(db) {
     router.post('/webhook/library-registration', authLimiter, validateBody(registrationSchema), asyncRoute(async (req, res) => {
         const { name, accountType, passcodeHash, workEmail, unitNumber, phone } = req.body;
         const isStaffLike = accountType === 'Staff' || accountType === 'Library Assistant';
+        const settings = getSettings();
 
         // SECURITY: identity and estate assignment are derived here, not
         // trusted from whatever the client sent for them — the estate
@@ -22,7 +24,7 @@ module.exports = function registrationRoutes(db) {
         let userId, estateBranch;
         if (isStaffLike) {
             const email = (workEmail || '').trim().toLowerCase();
-            const domain = process.env.STAFF_EMAIL_DOMAIN || 'unityhomes.co.ke';
+            const domain = settings.staffEmailDomain;
             if (!email.endsWith(`@${domain}`)) {
                 return res.status(400).json({ success: false, message: `Staff accounts require a work email ending in @${domain}.` });
             }
@@ -36,7 +38,12 @@ module.exports = function registrationRoutes(db) {
             userId = cleanedPhone;
             estateBranch = (req.body.estateBranch || '').trim();
             if (!estateBranch) {
-                return res.status(400).json({ success: false, message: 'Please select your estate.' });
+                return res.status(400).json({ success: false, message: `Please select your ${settings.branchLabel.toLowerCase()}.` });
+            }
+            // Only branches this organisation actually has. Without this check a
+            // hand-built request could register a member at a branch that doesn't exist.
+            if (!settings.branches.includes(estateBranch)) {
+                return res.status(400).json({ success: false, message: `Unknown ${settings.branchLabel.toLowerCase()}: choose one from the list.` });
             }
         }
 

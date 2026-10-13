@@ -4,6 +4,7 @@
 // see .env.example.
 const nodemailer = require('nodemailer');
 const axios = require('axios');
+const { getSettings } = require('./settings');
 
 let transporter = null;
 function getTransporter() {
@@ -24,7 +25,8 @@ async function sendEmail(to, subject, text) {
         console.log(`[email:fallback] To: ${to} | Subject: ${subject} | ${text}`);
         return;
     }
-    await t.sendMail({ from: process.env.SMTP_FROM || 'Unity Reads <no-reply@unityhomes.co.ke>', to, subject, text });
+    const s = getSettings();
+    await t.sendMail({ from: process.env.SMTP_FROM || `${s.libraryName} <no-reply@${s.staffEmailDomain}>`, to, subject, text });
 }
 
 async function sendSms(to, message) {
@@ -40,11 +42,12 @@ async function sendSms(to, message) {
 }
 
 async function sendVerificationCode(user, code) {
-    const message = `Your Unity Reads verification code is ${code}. It expires in 10 minutes.`;
+    const { libraryName } = getSettings();
+    const message = `Your ${libraryName} verification code is ${code}. It expires in 10 minutes.`;
     if (user.accountType === 'Resident') {
         await sendSms(user.phone || user.userId, message);
     } else {
-        await sendEmail(user.userId, 'Your Unity Reads verification code', message);
+        await sendEmail(user.userId, `Your ${libraryName} verification code`, message);
     }
 }
 

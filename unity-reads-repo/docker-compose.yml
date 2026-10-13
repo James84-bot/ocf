@@ -1,0 +1,20 @@
+# Run your own library:
+#   cp backend/.env.example backend/.env    # then edit name, branches, rules, JWT_SECRET
+#   docker compose up -d
+#   docker compose exec library node backend/scripts/seed.js backend/seed-data/inventory.xlsx   # optional: import books
+# Open http://localhost:3000
+services:
+  library:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: backend/.env
+    environment:
+      DATABASE_PATH: /app/data/unity_shelf.db
+      SERVE_FRONTEND: "true"
+    volumes:
+      - library-data:/app/data   # members, loans and books survive restarts and upgrades
+    restart: unless-stopped
+
+volumes:
+  library-data:

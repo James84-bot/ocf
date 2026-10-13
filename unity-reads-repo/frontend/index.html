@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Knowledge Hub — Unity Homes Library Portal</title>
+    <meta name="description" content="Community library: browse the catalogue, borrow, return and reserve books.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -25,7 +26,8 @@
         <div class="header-container">
             <a href="#" class="brand-logo" onclick="event.preventDefault(); router.navigate('catalog')">
                 
-                <span class="logo-bold"><img src="knowledge_hub.png" class="brand-logo-mark" alt="Knowledge Hub" onerror="this.style.display='none';"></span><span class="logo-light">Hub</span>
+                <img src="logo-mark.png" class="brand-logo-mark" id="brand-logo" alt="" onerror="this.style.display='none';">
+                <span class="brand-name" id="brand-name">Knowledge Hub</span>
             </a>
             <div id="nav-user-info" class="desktop-nav" style="display: none;">
                 <div class="user-menu" id="user-menu">
@@ -63,9 +65,9 @@
         <section class="hero-section">
             <div class="container hero-grid">
                 <div class="hero-copy">
-                    <span class="tagline-badge">A Unity Homes Community Amenity</span>
-                    <h1 class="hero-title">A shared shelf for every Unity Homes estate.</h1>
-                    <p class="hero-subtitle">Borrow a book, pass it on, and meet your neighbours in between. The Knowledge Hub runs on the same trust that built our estates — everything below is what's currently on it.</p>
+                    <span class="tagline-badge" id="brand-badge">A Unity Homes Community Amenity</span>
+                    <h1 class="hero-title" id="brand-tagline">A shared shelf for every Unity Homes estate.</h1>
+                    <p class="hero-subtitle" id="brand-intro">Borrow a book, pass it on, and meet your neighbours in between. The Knowledge Hub runs on the same trust that built our estates — everything below is what's currently on it.</p>
                 </div>
 
                 <div class="auth-card auth-toggle-card hero-auth-card">
@@ -110,7 +112,7 @@
                             </div>
                             <form onsubmit="handleRegistrationAttempt(event)" class="contact-form-matrix">
                                 <div class="form-group" id="estate-group">
-                                    <label class="form-label" for="signup-estate">Estate</label>
+                                    <label class="form-label" for="signup-estate" id="branch-label">Estate</label>
                                     <div class="input-wrapper">
                                         <i class="fas fa-map-pin input-icon"></i>
                                         <select id="signup-estate" class="form-input form-select" required>
@@ -130,7 +132,7 @@
                                         <i class="fas fa-users input-icon"></i>
                                         <select id="signup-affiliation" class="form-input form-select" onchange="toggleRegistrationFields(this.value)" required>
                                             <option value="" disabled selected>Select your account type</option>
-                                            <option value="Resident">Unity Homes Resident</option>
+                                            <option value="Resident" id="member-option">Unity Homes Resident</option>
                                             <option value="Staff">Operations Staff Member</option>
                                             <option value="Library Assistant">Library Assistant</option>
                                         </select>
@@ -145,7 +147,7 @@
                                 </div>
 
                                 <div class="form-group" id="staff-email-group" style="display: none;">
-                                    <label class="form-label" for="signup-work-email">Work Email <span class="pk-tag">[@unityhomes.co.ke]</span></label>
+                                    <label class="form-label" for="signup-work-email">Work Email <span class="pk-tag" id="staff-domain-tag">[@unityhomes.co.ke]</span></label>
                                     <div class="input-wrapper">
                                         <i class="fas fa-envelope input-icon"></i>
                                         <input type="email" id="signup-work-email" class="form-input" placeholder="you@unityhomes.co.ke">
@@ -153,7 +155,7 @@
                                 </div>
 
                                 <div class="form-group" id="resident-unit-group" style="display: none;">
-                                    <label class="form-label" for="signup-unit">Unit Number</label>
+                                    <label class="form-label" for="signup-unit" id="unit-label">Unit Number</label>
                                     <div class="input-wrapper">
                                         <i class="fas fa-door-open input-icon"></i>
                                         <input type="text" id="signup-unit" class="form-input" placeholder="e.g. WEST-14B">
@@ -164,6 +166,21 @@
                                     <div class="input-wrapper">
                                         <i class="fas fa-phone input-icon"></i>
                                         <input type="tel" id="signup-phone" class="form-input" placeholder="e.g. 07XXXXXXXX">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="signup-pin">Choose a PIN</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-key input-icon"></i>
+                                        <input type="password" id="signup-pin" class="form-input" inputmode="numeric" pattern="[0-9]{4,6}" minlength="4" maxlength="6" placeholder="4 to 6 digits" autocomplete="new-password" required>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="signup-pin-confirm">Confirm PIN</label>
+                                    <div class="input-wrapper">
+                                        <i class="fas fa-key input-icon"></i>
+                                        <input type="password" id="signup-pin-confirm" class="form-input" inputmode="numeric" pattern="[0-9]{4,6}" minlength="4" maxlength="6" placeholder="Repeat your PIN" autocomplete="new-password" required>
                                     </div>
                                 </div>
 
@@ -201,7 +218,7 @@
                 <div class="icon-badge icon-badge-outline"><i class="fas fa-scale-balanced"></i></div>
                 <div class="disclaimer-content">
                     <h3>Library Borrowing Rules</h3>
-                    <p>Books can be borrowed free of charge for up to <strong>21 days</strong>. Returning a book late will attract a fine of <strong class="penalty-highlight">KSH 50 per day</strong>. Accounts with fines overdue by more than 14 days will be temporarily suspended.</p>
+                    <p id="rules-text">Books can be borrowed free of charge for up to <strong>21 days</strong>. Returning a book late will attract a fine of <strong class="penalty-highlight">KSH 50 per day</strong>. Accounts with fines overdue by more than 14 days will be temporarily suspended.</p>
                 </div>
             </div>
         </section>
@@ -211,7 +228,7 @@
                 <div class="perk-item">
                     <div class="icon-badge icon-badge-2"><i class="fas fa-shield-halved"></i></div>
                     <h4>Resident Priority</h4>
-                    <p>Access is exclusive to Unity Homes residents and operations staff.</p>
+                    <p id="perk-access">Access is exclusive to Unity Homes residents and operations staff.</p>
                 </div>
                 <div class="perk-item">
                     <div class="icon-badge icon-badge-3"><i class="fas fa-arrows-rotate"></i></div>
@@ -221,7 +238,7 @@
                 <div class="perk-item">
                     <div class="icon-badge icon-badge-4"><i class="fas fa-people-group"></i></div>
                     <h4>Community Library</h4>
-                    <p>Shared across Unity One, West, East, Gardens, Silver Hill, and Parkside.</p>
+                    <p id="perk-branches">Shared across Unity One, West, East, Gardens, Silver Hill, and Parkside.</p>
                 </div>
             </div>
         </section>
@@ -368,6 +385,34 @@
                 <div id="admin-reservations-table" class="admin-table-wrap"></div>
             </div>
 
+            <div class="admin-panel mt-12">
+                <h3 class="trending-heading"><i class="fas fa-circle-plus"></i> Add a Book</h3>
+                <form id="admin-add-title-form" class="admin-form" onsubmit="handleAdminAddTitle(event)">
+                    <label class="admin-field"><span>Title</span><input class="form-input" name="title" maxlength="200" required></label>
+                    <label class="admin-field"><span>Author</span><input class="form-input" name="author" maxlength="120" required></label>
+                    <label class="admin-field"><span>Age group</span>
+                        <select class="form-input form-select" name="ageBracket" required><option value="Adults">Adults</option><option value="Kids">Children</option></select></label>
+                    <label class="admin-field"><span>ISBN <em>(optional, adds the cover)</em></span><input class="form-input" name="isbn" maxlength="20" inputmode="numeric"></label>
+                    <label class="admin-field"><span id="admin-branch-label">Branch</span><select class="form-input form-select admin-branch-select" name="branch" required></select></label>
+                    <label class="admin-field"><span>Copies</span><input class="form-input" name="copies" type="number" min="1" max="50" value="1" required></label>
+                    <button type="submit" class="btn btn-uh-primary">Add to catalogue</button>
+                </form>
+            </div>
+
+            <div class="admin-panel mt-12">
+                <h3 class="trending-heading"><i class="fas fa-map-location-dot"></i> Copies Without a Branch</h3>
+                <p class="text-xs text-secondary admin-help">Imported copies marked TBD can't be borrowed at a real location until they're placed.</p>
+                <div id="admin-unassigned" class="admin-table-wrap"></div>
+            </div>
+
+            <div class="admin-panel mt-12">
+                <h3 class="trending-heading"><i class="fas fa-file-arrow-down"></i> Export Records</h3>
+                <div class="admin-export-row">
+                    <button type="button" class="btn btn-uh-secondary" onclick="downloadAdminExport('loans')"><i class="fas fa-table"></i> Loans (CSV)</button>
+                    <button type="button" class="btn btn-uh-secondary" onclick="downloadAdminExport('catalogue')"><i class="fas fa-book"></i> Catalogue (CSV)</button>
+                </div>
+            </div>
+
             <div class="navigation-hub-tray mt-12">
                 <button onclick="router.navigate('catalog')" class="btn btn-uh-secondary"><i class="fas fa-book-bookmark"></i> Browse Catalog</button>
             </div>
@@ -384,10 +429,11 @@
 
     <footer class="global-footer">
         <div class="container text-center">
-            <p>&copy; 2026 Knowledge Hub — a Unity Homes Library System. All transaction records safely secured.</p>
+            <p id="footer-text">&copy; 2026 Knowledge Hub — a Unity Homes Library System. All transaction records safely secured.</p>
         </div>
     </footer>
 
+    <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
