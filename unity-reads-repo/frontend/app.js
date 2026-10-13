@@ -741,7 +741,7 @@ async function initHeroSlider() {
 
     track.innerHTML = previewTitles.map((t, i) => {
         const availableCopy = (t.copies || []).find(c => c.status === 'AVAILABLE');
-        const tag = availableCopy ? `Available at ${availableCopy.branch}` : 'Currently all on loan';
+        const tag = availableCopy ? (availableCopy.branch === 'TBD' ? 'Available' : `Available at ${availableCopy.branch}`) : 'Currently all on loan';
         return `
             <div class="hero-slide hero-slide-bg-${i % 4} ${i === 0 ? 'active' : ''}" data-slide-index="${i}">
                 <i class="fas ${icons[i % icons.length]} hero-slide-icon"></i>
@@ -886,10 +886,12 @@ function compileCatalogDisplayBlock() {
                 return acc;
             }, {})
         ).map(([branch, summary]) => {
+            // Imported copies without a branch yet are stored as 'TBD'; show members something clearer.
+            const branchLabel = branch === 'TBD' ? 'Location pending' : branch;
             if (summary.available > 0) {
                 return `
                     <div class="branch-copy-row">
-                        <span class="branch-copy-label">${esc(branch)}: ${summary.available}/${summary.total} available</span>
+                        <span class="branch-copy-label">${esc(branchLabel)}: ${summary.available}/${summary.total} available</span>
                         <button onclick="processBorrowTransaction('${jsq(t.id)}', '${jsq(branch)}')" class="branch-borrow-btn">Borrow</button>
                     </div>
                 `;
@@ -906,7 +908,7 @@ function compileCatalogDisplayBlock() {
             }
             return `
                 <div class="branch-copy-row">
-                    <span class="branch-copy-label">${esc(branch)}: 0/${summary.total} available</span>
+                    <span class="branch-copy-label">${esc(branchLabel)}: 0/${summary.total} available</span>
                     ${rightSide}
                 </div>
             `;
@@ -1157,7 +1159,7 @@ window.processBorrowTransaction = async function(titleId, branch) {
         return;
     }
 
-    showToast(`Checked out: "${title.title}" from ${branch}.`);
+    showToast(branch === 'TBD' ? `Checked out: "${title.title}".` : `Checked out: "${title.title}" from ${branch}.`);
     router.navigate('dashboard');
 };
 
