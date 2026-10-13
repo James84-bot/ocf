@@ -404,3 +404,6 @@ h1, h2, h3, h4, .auth-title, .section-title, .hero-title, .logo-bold, .logo-ligh
 #admin-unassigned thead th { position: sticky; top: 0; z-index: 1; }
 .admin-panel + .admin-panel { margin-top: 3rem; }
 .admin-panel > .trending-heading { margin-bottom: 1rem; }
+/* The admin strip can show a fifth figure (copies without a branch); keep it on one row on wide screens. */
+#admin-stats-strip:has(> .stat-item:nth-child(5)) { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 900px) { #admin-stats-strip:has(> .stat-item:nth-child(5)) { grid-template-columns: repeat(2, 1fr); } }
