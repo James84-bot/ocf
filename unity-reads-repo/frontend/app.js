@@ -1174,7 +1174,7 @@ function compileDashboardDisplayBlock() {
 
     if (matchedLoans.length === 0) {
         listGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; font-size: 0.85rem; color: var(--text-secondary); padding: 3rem 0; font-style: italic;">You do not have any borrowed books right now.</p>`;
-        dynamicBalanceBadge.innerHTML = `Total Balance: <span style='color: var(--text-dark)'>${esc(SETTINGS.currency)} 0</span>`;
+        dynamicBalanceBadge.innerHTML = `Total Balance: <span style='color: #FFFFFF; font-weight: 800;'>${esc(SETTINGS.currency)} 0</span>`;
         return;
     }
 
@@ -1208,7 +1208,7 @@ function compileDashboardDisplayBlock() {
         `;
     }).join('');
 
-    dynamicBalanceBadge.innerHTML = `Total Outstanding Balance: <span style="color: ${aggregateSystemFine > 0 ? 'var(--uh-red)' : 'var(--text-dark)'}; font-weight: 800;">${esc(SETTINGS.currency)} ${aggregateSystemFine}</span>`;
+    dynamicBalanceBadge.innerHTML = `Total Outstanding Balance: <span style="color: ${aggregateSystemFine > 0 ? '#FFC2C6' : '#FFFFFF'}; font-weight: 800;">${esc(SETTINGS.currency)} ${aggregateSystemFine}</span>`;
 }
 
 // Processes a book return transaction — finds the specific copy (by
