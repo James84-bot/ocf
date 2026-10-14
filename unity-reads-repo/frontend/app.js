@@ -1198,7 +1198,7 @@ function compileDashboardDisplayBlock() {
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
                     <div>
                         <h4 class="auth-title">${esc(loan.book_title)}</h4>
-                        <p class="text-xs text-secondary" style="margin-top: 0.25rem;">${loan.branch ? `${esc(loan.branch)} · ` : ''}Borrowed for: <strong>${structuralMetrics.daysElapsed} days</strong></p>
+                        <p class="text-xs text-secondary" style="margin-top: 0.25rem;">${loan.branch ? `${esc(loan.branch === 'TBD' ? 'Location pending' : loan.branch)} · ` : ''}Borrowed for: <strong>${structuralMetrics.daysElapsed} days</strong></p>
                     </div>
                     ${statusNoticeString}
                 </div>
