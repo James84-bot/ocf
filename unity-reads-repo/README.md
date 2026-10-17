@@ -18,6 +18,13 @@ unity-reads-repo/
 └── docker-compose.yml
 ```
 
+## Try it
+
+**Live demo:** <https://james84-bot.github.io/ocf/?demo>. It runs entirely in your browser with the real
+catalogue (812 titles, 1,313 copies) and demo accounts shown at the top of the page; nothing is sent
+anywhere and **Reset demo** starts over. Log in as the resident to borrow, return and join a waitlist, or as
+the library assistant for the front desk, adding books, placing copies and CSV exports.
+
 ## What it does
 
 - **Catalogue:** search by title or author, filter by availability, adults' and children's
@@ -83,6 +90,13 @@ Your catalogue comes from a spreadsheet with `Titles` and `Copies` sheets (see
 `backend/README.md`), or add books one by one from the Admin Dashboard. Copies imported without
 a branch show up there under **Copies Without a Branch** so staff can place them.
 
+### Demo mode
+
+`frontend/demo/demo-api.js` answers the app's API calls in the browser when the page is opened with `?demo`,
+following the same rules as the server. Rebuild its catalogue after changing your books:
+`npm run seed -- seed-data/inventory.xlsx && npm run demo-catalogue` (in `backend/`). Open with `?live` to
+leave demo mode.
+
 SMS (Africa's Talking) and email (any SMTP server) are optional. Without them, verification codes
 and notices print to the server log, so you can try the whole flow first.
 
@@ -99,6 +113,6 @@ the backend's URL in `frontend/config.js`, and add the frontend's address to `CO
 cd backend && npm test
 ```
 
-33 tests against a real in-memory SQLite database: sign-in and lockout, the double-borrow 409,
+35 tests against a real in-memory SQLite database: sign-in and lockout, the double-borrow 409, returns,
 fines and suspension, branch checks, settings, catalogue tools, CSV safety and waitlist notices.
 They run on every push and pull request (`.github/workflows/test.yml`).

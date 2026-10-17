@@ -407,3 +407,12 @@ h1, h2, h3, h4, .auth-title, .section-title, .hero-title, .logo-bold, .logo-ligh
 /* The admin strip can show a fifth figure (copies without a branch); keep it on one row on wide screens. */
 #admin-stats-strip:has(> .stat-item:nth-child(5)) { grid-template-columns: repeat(5, 1fr); }
 @media (max-width: 900px) { #admin-stats-strip:has(> .stat-item:nth-child(5)) { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---- Demo mode banner (demo/demo-api.js) ---- */
+.demo-bar { position: relative; z-index: 1000; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1rem;
+  padding: 0.55rem 1.25rem; background: var(--uh-navy); color: #fff; font-size: 0.82rem; line-height: 1.4; }
+.demo-bar strong { background: var(--uh-red); padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.75rem; letter-spacing: 0.03em; text-transform: uppercase; }
+.demo-bar code { background: rgba(255, 255, 255, 0.14); padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.8rem; }
+.demo-bar .demo-logins { margin-right: auto; }
+.demo-bar button { font: inherit; font-weight: 700; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 6px; padding: 0.25rem 0.7rem; cursor: pointer; }
+.demo-bar button:hover { background: rgba(255, 255, 255, 0.12); }

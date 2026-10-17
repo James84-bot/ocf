@@ -19,7 +19,7 @@ const CONFIG = {
   ADMIN_ADD_TITLE: api('/webhook/library-admin-add-title'),
   ADMIN_EXPORT: (kind) => api(`/webhook/library-admin-export/${kind}`),
   SETTINGS: api('/api/settings'),
-  DATABASE_LOCAL_KEY: "unity_hub_circulation_state_v1"
+  DATABASE_LOCAL_KEY: window.UNITY_SHELF_STORAGE_KEY || "unity_hub_circulation_state_v1"
 };
 
 // Escape anything that came from data (titles, names, branches) before it goes
@@ -645,9 +645,10 @@ async function fetchRemoteIndexData() {
 }
 
 // Sends borrow and return transactions to the backend.
-// Returns { ok: true } on success, { ok: false, conflict: true, message } when the server
-// actively rejected the request (e.g. book already taken), or { ok: false, conflict: false }
-// when it's a genuine network failure that should fall back to offline queueing.
+// Returns { ok: true, data } on success (data is the server's reply, e.g. the real loanId);
+// { ok: false, conflict: true, message } when the server refused the request (copy taken,
+// account locked, loan not found, not your loan); or { ok: false, conflict: false } only for
+// a genuine network failure, which is the one case that falls back to offline queueing.
 async function transmitTransactionPayload(eventAction, dataContext) {
     const trackingPayload = { event: eventAction, timestamp: new Date().toISOString(), user: AppState.currentUser, data: dataContext };
     try {
@@ -656,14 +657,15 @@ async function transmitTransactionPayload(eventAction, dataContext) {
             headers: { 'Content-Type': 'application/json', ...authHeaders() },
             body: JSON.stringify(trackingPayload)
         });
-        if (response.status === 409) {
-            const result = await response.json().catch(() => ({}));
-            return { ok: false, conflict: true, message: result.message || 'That copy is no longer available.' };
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            // The server answered and said no. That is not an offline situation: report it,
+            // so the caller can undo its optimistic change instead of pretending it worked.
+            return { ok: false, conflict: true, status: response.status, message: result.message || 'The library could not complete that request.' };
         }
-        if (!response.ok) throw new Error("Server rejected data mapping.");
         AppState.offlineMode = false;
         saveStateToStorage();
-        return { ok: true };
+        return { ok: true, data: result };
     } catch (error) {
         AppState.offlineMode = true;
         saveStateToStorage();
@@ -1159,6 +1161,13 @@ window.processBorrowTransaction = async function(titleId, branch) {
         return;
     }
 
+    // Use the server's loan id and time, so a later return refers to the real loan record.
+    if (result.ok && result.data && result.data.loanId) {
+        transactionObject.id = result.data.loanId;
+        if (result.data.borrowedAt) transactionObject.borrowed_at = result.data.borrowedAt;
+        saveStateToStorage();
+    }
+
     showToast(branch === 'TBD' ? `Checked out: "${title.title}".` : `Checked out: "${title.title}" from ${branch}.`);
     router.navigate('dashboard');
 };
@@ -1215,19 +1224,31 @@ function compileDashboardDisplayBlock() {
 // copyId) across all titles and flips it back to AVAILABLE.
 window.processReturnTransaction = async function(loanId, copyId) {
     const returningLoan = AppState.loans.find(l => l.id === loanId);
+    let returnedCopy = null, previousStatus = null;
     AppState.loans = AppState.loans.filter(l => l.id !== loanId);
 
     for (const title of AppState.titles) {
         const copy = title.copies.find(c => c.copyId === copyId);
-        if (copy) { copy.status = 'AVAILABLE'; break; }
+        if (copy) { returnedCopy = copy; previousStatus = copy.status; copy.status = 'AVAILABLE'; break; }
     }
 
     saveStateToStorage();
-    showToast("Book returned successfully.");
     compileDashboardDisplayBlock();
     bumpActiveLoansStat(-1);
 
-    await transmitTransactionPayload('BOOK_RETURNED', { copyId: copyId, titleId: returningLoan ? returningLoan.title_id : '', loanId: loanId, returnedAt: new Date().toISOString() });
+    const result = await transmitTransactionPayload('BOOK_RETURNED', { copyId: copyId, titleId: returningLoan ? returningLoan.title_id : '', loanId: loanId, returnedAt: new Date().toISOString() });
+    if (result.conflict) {
+        // The server refused: put the loan back exactly as it was, and say why.
+        if (returningLoan) AppState.loans.push(returningLoan);
+        if (returnedCopy) returnedCopy.status = previousStatus;
+        saveStateToStorage();
+        compileDashboardDisplayBlock();
+        bumpActiveLoansStat(1);
+        showToast(`❌ ${result.message}`);
+        return;
+    }
+    showToast(result.ok ? "Book returned successfully." : "Return saved on this device; it will sync when you're back online.");
+    if (result.ok) await fetchRemoteIndexData();   // pick up anything the return changed (e.g. a waitlist hold)
 };
 
 // Handles clicking "Reserve" on a title with no available copies at a

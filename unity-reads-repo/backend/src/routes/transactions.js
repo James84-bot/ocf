@@ -82,9 +82,13 @@ function handleBorrow(db, req, res, userId, data) {
 
 function handleReturn(db, req, res, userId, data) {
     const runReturn = db.transaction(() => {
-        const loan = data.loanId
-            ? db.prepare(`SELECT * FROM loans WHERE id = ?`).get(data.loanId)
-            : db.prepare(`SELECT * FROM loans WHERE copy_id = ? AND returned_at IS NULL`).get(data.copyId);
+        // Prefer the loan id; if the client only knows a temporary id (an older page
+        // version, or a return made before its first sync), fall back to the active
+        // loan on that copy. Ownership is still checked below either way.
+        let loan = data.loanId ? db.prepare(`SELECT * FROM loans WHERE id = ?`).get(data.loanId) : null;
+        if (!loan || loan.returned_at) {
+            loan = db.prepare(`SELECT * FROM loans WHERE copy_id = ? AND returned_at IS NULL`).get(data.copyId) || loan;
+        }
 
         if (!loan || loan.returned_at) {
             const err = new Error('That loan is not currently active.');
