@@ -172,3 +172,35 @@ describe('reservation-ready notice', () => {
         expect(logs.some(l => l.includes('0733000000') && l.includes('Ant Attack') && l.includes('ready for pickup'))).toBe(true);
     });
 });
+
+describe('returning a book', () => {
+    it('finds the active loan by copy when the page sends a temporary loan id', async () => {
+        const { app, db } = buildTestApp();
+        const member = addUser(db, '0744000000');
+        db.prepare(`INSERT INTO titles (id, title, author, age_bracket) VALUES ('T0001', 'Ant Attack', 'A. Mcgowan', 'Kids')`).run();
+        db.prepare(`INSERT INTO copies (copy_id, title_id, branch, status) VALUES ('C00001', 'T0001', 'Unity West', 'AVAILABLE')`).run();
+        const borrow = await request(app).post('/webhook/library-update').set(bearer(member))
+            .send({ event: 'BOOK_BORROWED', data: { copyId: 'C00001', titleId: 'T0001', branch: 'Unity West', loanId: 'l_temp_from_page' } });
+        expect(borrow.body.loanId).toMatch(/^l_/);
+        expect(borrow.body.loanId).not.toBe('l_temp_from_page');
+
+        const ret = await request(app).post('/webhook/library-update').set(bearer(member))
+            .send({ event: 'BOOK_RETURNED', data: { copyId: 'C00001', loanId: 'l_temp_from_page' } });
+        expect(ret.status).toBe(200);
+        expect(db.prepare(`SELECT returned_at FROM loans`).get().returned_at).toBeTruthy();
+        expect(db.prepare(`SELECT status FROM copies WHERE copy_id = 'C00001'`).get().status).toBe('AVAILABLE');
+    });
+
+    it("still refuses to return someone else's loan through the fallback", async () => {
+        const { app, db } = buildTestApp();
+        const owner = addUser(db, '0755000000');
+        const other = addUser(db, '0766000000');
+        db.prepare(`INSERT INTO titles (id, title, author, age_bracket) VALUES ('T0001', 'Ant Attack', 'A. Mcgowan', 'Kids')`).run();
+        db.prepare(`INSERT INTO copies (copy_id, title_id, branch, status) VALUES ('C00001', 'T0001', 'Unity West', 'AVAILABLE')`).run();
+        await request(app).post('/webhook/library-update').set(bearer(owner))
+            .send({ event: 'BOOK_BORROWED', data: { copyId: 'C00001', titleId: 'T0001', branch: 'Unity West' } });
+        const ret = await request(app).post('/webhook/library-update').set(bearer(other))
+            .send({ event: 'BOOK_RETURNED', data: { copyId: 'C00001', loanId: 'made-up' } });
+        expect(ret.status).toBe(403);
+    });
+});
